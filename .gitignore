@@ -1,0 +1,7 @@
+# Build and docs folder/files
+build/*
+dist/*
+.DS_Store
+node_modules/
+strippedPages/
+.env

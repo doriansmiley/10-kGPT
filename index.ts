@@ -5,7 +5,7 @@ interface Filing {
   primaryDocument: string;
 }
 
-export async function extract10Qand10KUrls(
+async function extract10Qand10KUrls(
   edgarUrl: string
 ): Promise<{ q10Url?: string[]; k10Url?: string[] }> {
   const response = await fetch(edgarUrl);
@@ -15,7 +15,7 @@ export async function extract10Qand10KUrls(
   const q10Url: string[] = [];
   const k10Url: string[] = [];
 
-  filings?.form?.forEach((f: string, index) => {
+  filings?.form?.forEach((f: string, index: number) => {
     if (f === '10-Q') {
       const accessionNumber = filings.accessionNumber[index].replace(/-/g, '');
       q10Url.push(
@@ -33,36 +33,42 @@ export async function extract10Qand10KUrls(
   return { q10Url, k10Url };
 }
 
-export async function fetch10qs(reportTypes: string[], q10Urls: string[]) {
+async function fetch10qs(reportTypes: string[], q10Urls: string[]) {
   const reports: string[] = [];
   console.log(reportTypes);
+
   q10Urls.forEach(async (url) => {
     console.log(url);
-    const response = await fetch(url);
+    const response = await fetch(url, { mode: 'no-cors' });
     const html = await response.text();
+    console.log(response)
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
 
     reportTypes.forEach(async (reportType) => {
-      console.log(reportType);
-      const report = doc.querySelector(`a[href*='${reportType}']`);
+      const headings = doc.querySelectorAll('a');
+      console.log(headings);
+      const report = [...headings].find((a) => a.textContent?.includes(reportType));
+      console.log(report);
       if (report) {
         const reportUrl = report.getAttribute('href');
         const reportResponse = await fetch(`https://www.sec.gov${reportUrl}`);
         const reportHtml = await reportResponse.text();
+        console.log(reportHtml.length);
         reports.push(reportHtml);
       }
     });
   });
-
   return reports;
 }
+
+
 
 async function main() {
   const edgarUrl = 'https://data.sec.gov/submissions/CIK0001321655.json';
 
   // Write TypeScript code!
-  const appDiv: HTMLElement = document.getElementById('app');
+  const appDiv: HTMLElement = document.getElementById('app') as HTMLElement;
   appDiv.innerHTML = `<h1>TypeScript Starter</h1>`;
 
   const { q10Url, k10Url } = await extract10Qand10KUrls(edgarUrl);
@@ -70,10 +76,10 @@ async function main() {
   appDiv.innerHTML += `<ul>`;
   console.log(`10-Q URL: ${q10Url}`);
   console.log(`10-K URL: ${k10Url}`);
-  q10Url.forEach((url) => {
+  q10Url?.forEach((url) => {
     appDiv.innerHTML += `<li><a href="${url}">10-Q URL: ${url}</a></li>`;
   });
-  k10Url.forEach((url) => {
+  k10Url?.forEach((url) => {
     appDiv.innerHTML += `<li><a href="${url}">10-K URL: ${url}</a></li>`;
   });
   appDiv.innerHTML += `</ul>`;
@@ -87,7 +93,7 @@ async function main() {
         'Condensed Consolidated Statements of Stockholders’ Equity',
         'Condensed Consolidated Statements of Cash Flows',
       ],
-      q10Url
+      q10Url || []
     );
 
     appDiv.innerHTML += `<ul>`;

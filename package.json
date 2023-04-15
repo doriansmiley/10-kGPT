@@ -1,6 +1,19 @@
 {
-  "name": "typescript",
-  "version": "0.0.0",
-  "private": true,
-  "dependencies": {}
+  "name": "your-project-name",
+  "version": "1.0.0",
+  "description": "Your project description",
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && live-server"
+  },
+  "devDependencies": {
+    "typescript": "latest"
+  },
+  "dependencies": {
+    "debug": "^4.3.4",
+    "dotenv": "^16.0.3",
+    "jsdom": "^21.1.1",
+    "openai": "^3.2.1",
+    "uuid": "^9.0.0"
+  }
 }

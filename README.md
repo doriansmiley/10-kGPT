@@ -11,9 +11,7 @@ It's important to note you can't just pass the entire filling or you will hit GP
 This is why I parse the tables from the page HTML, which is the most dogshit HTML I have ever seen.
 
 # Help Wanted
-I'd like to extend this beyond Palantir by looking up the ID values
-in this URL `https://data.sec.gov/submissions/CIK0001321655.json` in the SEC database
-by using the API in the EDGAR system. I also want to parse more tables from the 10-Q. I'd also like to extend to 10-Ks which are more complicated to parse.
+I want to parse more tables from the 10-Q. I'd also like to extend to 10-Ks which are more complicated to parse.
 
 It's important to note you can't just pass the entire filling or you will hit GPT token limits.
 
@@ -24,3 +22,8 @@ It's important to note you can't just pass the entire filling or you will hit GP
 `npm run start`
 
 This will run `node node-index` and save responses to the `responses` directory. 
+
+## Run for specific ticker
+You can specify a company using `--ticker` option. In below example, replace `PLTR` with ticker of your choice.
+
+`npm run start -- --ticker PLTR`

@@ -1,7 +1,6 @@
 const fs = require('fs');
 const { JSDOM } = require('jsdom');
 const { v4: uuidv4 } = require('uuid');
-const { Node } = require('jsdom');
 const { Configuration, OpenAIApi } = require("openai");
 
 const debug = require('debug')('10k');
@@ -41,58 +40,80 @@ async function extract10Qand10KUrls(
   return { q10Url, k10Url };
 }
 
-async function fetch10qs(reportTypes, q10Urls) {
-  const reports = [];
-
-  q10Urls.forEach(async (url) => {
+async function fetch10qs(q10Urls) {
+  for (const url of q10Urls) {
     const response = await fetch(url, { mode: 'no-cors' });
     const html = await response.text();
-    reportTypes.forEach(async (report) => {
-      await findTableByTargetText(html, report, url);
+    const pages = parse10QPages(html);
+    const promises = []
+    pages.forEach((page, index)=>{
+      debug(`stripping page`);
+      const stripped = removeAttributes(page);
+      promises.push(getOpenAIResponse(stripped, index));
     });
-  });
-  return reports;
+    await Promise.all(promises);
+  }
 }
 
-async function findTableByTargetText(html, targetText, url) {
+function parse10QPages(html) {
+  const pages = [];
   const dom = new JSDOM(html);
-  const document = dom.window.document;
-  // Find all TOC links containing the target text
-  const tocLinks = [...document.querySelectorAll('a[href^="#"]')].filter((link) => {
-    const href = link.getAttribute('href').slice(1); // Remove the '#' symbol
-    if (href.length <= 9) { // Check href length
-      return false;
+  const pageDivs = dom.window.document.querySelectorAll('*');
+
+  let currentPage = null;
+  let tocFound = false;
+
+  for (let i = 0; i < pageDivs.length; i++) {
+    const div = pageDivs[i];
+
+    if (!tocFound && div.textContent.toLowerCase().includes('table of contents')) {
+      tocFound = true;
+      currentPage = dom.window.document.createElement('div');
+      currentPage.appendChild(div.cloneNode(true));
+    } else if (tocFound && div.tagName === 'HR') {
+      currentPage.appendChild(div.cloneNode(true));
+      const optimized = htmlToTextExceptTables(currentPage.outerHTML);
+      pages.push(optimized);
+      currentPage = null;
+      tocFound = false;
+    } else if (tocFound) {
+      currentPage.appendChild(div.cloneNode(true));
     }
-    return link.textContent.includes(targetText);
-  });
-  if (!tocLinks) {
-    return;
   }
-  // Find the corresponding divs for the TOC links
-  const targetDivs = tocLinks.map((link) => {
-    const href = link.getAttribute('href').slice(1); // Remove the '#' symbol
-    const targetDiv = document.getElementById(href);
-    return targetDiv;
-  });
 
-  // Find the tables following each target div
-  const tables = targetDivs.flatMap(async (targetDiv) => {
-    if (!targetDiv) {
-      return null;
-    }
-    let sibling = targetDiv.nextElementSibling;
-    while (sibling) {
-      if (sibling.innerHTML.includes('<table')) {
-        debug(`Table found for "${targetText}"`);
-        await getOpenAIResponse(removeAttributes(sibling.outerHTML), targetText);
-        return sibling;
+  return pages;
+}
+
+
+function htmlToTextExceptTables(html) {
+  const dom = new JSDOM();
+  const doc = dom.window.document;
+  const div = doc.createElement('div');
+  div.innerHTML = html;
+  let output = '';
+  const Node = new JSDOM('').window.Node;
+  function extractNode(node) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      if (node.tagName === 'TABLE') {
+        // debug('found a table');
+        output += node.outerHTML;
+      } else if (node.childNodes.length > 0) {
+        // debug('found a child node');
+        for (let i = 0; i < node.childNodes.length; i++) {
+          extractNode(node.childNodes[i]);
+        }
       }
-      sibling = sibling.nextElementSibling;
+    } else if (node.nodeType === Node.TEXT_NODE) {
+      // debug('found a text node');
+      output += node.nodeValue;
     }
-    return null;
-  });
+  }
 
-  return tables.filter((table) => table !== null);
+  for (let i = 0; i < div.childNodes.length; i++) {
+    extractNode(div.childNodes[i]);
+  }
+  // debug('retuning output')
+  return output;
 }
 
 function removeAttributes(html) {
@@ -101,29 +122,34 @@ function removeAttributes(html) {
   });
 }
 
-async function getOpenAIResponse(table, targetText) {
-  let prompt = 'I am a financial analyst working at PwC. Please summerize the extracted table data from the Palantir 10-Q filling in an HTML table listing positives and negatives. Format the output as HTML.';
-  const question = table;
+async function getOpenAIResponse(html, fileName) {
+  if (fileName > 9) {
+    // save time and money, there could be a ton of pages! 10 is fine
+    return;
+  }
+  let prompt = `Please analyze the extracted page from the 10-Q filling in an HTML table listing positives and negatives. Indicate the page number using ${fileName}. Format the output as HTML.`;
+  const question = html;
   prompt += `\nYou: ${question}\n`;
 
-  const count = prompt.split(' ').length + table.split(' ').length;
+  await fs.promises.writeFile(`./pages/${fileName}-${uuidv4()}.html`, html);
+
+  const count = prompt.split(' ').length + html.split(' ').length;
   if (count > 4000) {
     debug(`Token count: ${count} exceeds maximum`);
     return;
   }
 
-  //debug(`Calling OpenAI API with prompt: ${prompt}`);
+  debug(`Calling OpenAI API with count: ${count}`);
   try {
     const gptResponse = await openai.createChatCompletion({
       model: "gpt-3.5-turbo",
       messages: [
         { "role": "system", "content": "I am a financial analyst working at PwC. I am doing due dilligence of SEC 10-Q and 10-K fillings." },
-        { "role": "user", "content": `Please summerize the extracted financial data from the Palantir 10-Q filling in an HTML table listing positives and negatives. \r\n ${table}` },
+        { "role": "user", "content": prompt },
       ]
     });
     const uniqueId = uuidv4();
-    const file = `<html><body><h1>${targetText}</h1>${gptResponse.data.choices[0].message.content}</body></html>`;
-    const fileName = targetText.replace(' ', '-');
+    const file = `<html><body><h1>${fileName}</h1>${gptResponse.data?.choices[0]?.message?.content}</body></html>`;
     await fs.promises.writeFile(`./responses/${fileName}-${uniqueId}.html`, file);
   } catch (e) {
     debug(e.message);
@@ -137,14 +163,6 @@ async function main() {
 
   const { q10Url, k10Url } = await extract10Qand10KUrls(edgarUrl);
   const reports = await fetch10qs(
-    [
-      'Financial Statements (Unaudited)',
-      'Condensed Consolidated Balance Sheets',
-      'Condensed Consolidated Statements of Operations',
-      'Condensed Consolidated Statements of Comprehensive Loss',
-      'Condensed Consolidated Statements of Stockholders’ Equity',
-      'Condensed Consolidated Statements of Cash Flows',
-    ],
     q10Url || []
   );
   return true;

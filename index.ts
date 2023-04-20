@@ -5,6 +5,21 @@ interface Filing {
   primaryDocument: string;
 }
 
+async function getCompanyDetails(ticker) {
+  const searchUrl = `https://www.sec.gov/cgi-bin/browse-edgar?CIK=${ticker}&owner=exclude&action=getcompany&output=atom`;
+
+  const response = await fetch(searchUrl);
+  const xmlData = await response.text();
+
+  const dom = new JSDOM(xmlData, { contentType: "application/xml" });
+  const document = dom.window.document;
+
+  const cik = document.querySelector('cik').textContent;
+  const companyName = document.querySelector('conformed-name').textContent;
+
+  return { cik, ticker, companyName };
+}
+
 async function extract10Qand10KUrls(
   edgarUrl: string
 ): Promise<{ q10Url?: string[]; k10Url?: string[] }> {

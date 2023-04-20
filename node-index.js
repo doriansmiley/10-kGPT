@@ -156,8 +156,29 @@ async function getOpenAIResponse(html, fileName) {
   }
 }
 
+async function getCompanyDetails(ticker) {
+  const searchUrl = `https://www.sec.gov/cgi-bin/browse-edgar?CIK=${ticker}&owner=exclude&action=getcompany&output=atom`;
+
+  const response = await fetch(searchUrl);
+  const xmlData = await response.text();
+
+  const dom = new JSDOM(xmlData, { contentType: "application/xml" });
+  const document = dom.window.document;
+
+  const cik = document.querySelector('cik').textContent;
+  const companyName = document.querySelector('conformed-name').textContent;
+
+  return { cik, ticker, companyName };
+}
+
 async function main() {
-  const edgarUrl = 'https://data.sec.gov/submissions/CIK0001321655.json';
+  const ticker = process.argv[2];
+  debug("command: " + ticker);
+  debug("argv: " + process.argv);
+  const { cik, companyName } = await getCompanyDetails(ticker);
+  debug (cik);
+  debug(companyName);
+  const edgarUrl = `https://data.sec.gov/submissions/${cik}.json`;
   const jsdom = require('jsdom');
   const { JSDOM } = jsdom;
 

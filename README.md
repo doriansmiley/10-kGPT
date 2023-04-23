@@ -25,7 +25,7 @@ It's important to note you can't just pass the entire filling or you will hit GP
 
 # Run
 - Create the pages directory. This is where pages are saved for research puposes. I ignore this directory since it will result in a large number of files. After creating the pages directory 
-- Creatre your .env file and add `OPENAI_API_KEY=<YOUR KEY>`
+- Creatre your .env file and add `OPENAI_API_KEY=<YOUR_KEY>`, `SEC_API_KEY=<YOUR_KEY>` and `SEC_API_ENDPOINT=https://api.sec-api.io/`
 - run `npm run start $TICKER` passing the ticker symbol of the ocmpany you want to analyze.
 
 This will run `node node-index` passing the ticker symbok you specify and save responses to the `responses` directory. 

@@ -15,6 +15,7 @@ I'd like to:
 - Figure out how to summerize the responses and get a final score on whether to invest
 - Store SEC filings, the inputs to OpenAI, and responses in a vector database
 - Implement LangChain or Haystack to generate and retrieve summaries using a supported LLM
+- Process the most rescent 20-K
 
 The responses need to be improved as well. We need to track the URL of the 10-Q that the page comes from. Also, I have ssen the model outputing wierd lage numbers at the bootom of the page in some cases. This prompt may need improvement: `Indicate the page number using ${fileName}`. The unltimate goal is to audit the responses and rate them 0-7 for quality after a manual review of the 10-Q.
 
@@ -28,7 +29,7 @@ It's important to note you can't just pass the entire filling or you will hit GP
 - Creatre your .env file and add `OPENAI_API_KEY=<YOUR_KEY>`, `SEC_API_KEY=<YOUR_KEY>` and `SEC_API_ENDPOINT=https://api.sec-api.io/`
 - run `npm run start $TICKER` passing the ticker symbol of the ocmpany you want to analyze.
 
-This will run `node node-index` passing the ticker symbok you specify and save responses to the `responses` directory. 
+This will run `node node-index` passing the ticker symbok you specify and save responses to the `responses` directory. The script currently only analyzes the most rescent 10-Q. 
 
 You can view output in the responses directory. The chunks used to generate each response is under 
 `responses/secAPI`. This can be useful to audit what inputs were used to generatr the response. 

@@ -15,7 +15,7 @@ I'd like to:
 - Figure out how to summerize the responses and get a final score on whether to invest
 - Store SEC filings, the inputs to OpenAI, and responses in a vector database
 - Implement LangChain or Haystack to generate and retrieve summaries using a supported LLM
-- Process the most rescent 20-K
+- Process all the returned filings
 
 The responses need to be improved as well. We need to track the URL of the 10-Q that the page comes from. Also, I have ssen the model outputing wierd lage numbers at the bootom of the page in some cases. This prompt may need improvement: `Indicate the page number using ${fileName}`. The unltimate goal is to audit the responses and rate them 0-7 for quality after a manual review of the 10-Q.
 

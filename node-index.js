@@ -59,7 +59,7 @@ async function extract10Qand10KUrls(cik) {
   return { q10Url, k10Url };
 }
 
-async function getOpenAIResponse(text, fileName, sourceUrl) {
+async function getOpenAIResponse(text, fileName, sourceUrl, filingType) {
   if (fileName > 9) {
     // save time and money, there could be a ton of pages! 10 is fine
     return;
@@ -86,7 +86,7 @@ async function getOpenAIResponse(text, fileName, sourceUrl) {
       ]
     });
     const file = `<html><body><h1>${fileName}</h1><p> <a href="${sourceUrl}">Source: ${sourceUrl}</a></p>${gptResponse.data?.choices[0]?.message?.content}</body></html>`;
-    await fs.promises.writeFile(`./responses/${fileName}.html`, file);
+    await fs.promises.writeFile(`./responses/${filingType}/${fileName}.html`, file);
   } catch (e) {
     debug(e.message);
   }
@@ -104,7 +104,7 @@ async function extract10QSections(apiToken, edgarUrl, partIdentifierMap) {
   return Object.fromEntries(sections);
 }
 
-async function chunkText(text, fileName) {
+async function chunkText(text, fileName, filingType) {
   const CHUNK_SIZE = 1500;
   const regex = new RegExp(`(.{1,${CHUNK_SIZE}})\\s+`, 'g');
   let partNumber = 0;
@@ -117,7 +117,7 @@ async function chunkText(text, fileName) {
     if (chunks.join(' ').split(/\s+/).length > CHUNK_SIZE) {
       // if the total number of tokens exceeds the max chunk size, write to file and reset
       promises.push(
-        fs.promises.writeFile(`./responses/secAPI/${fileName}-${partNumber}.txt`, chunks.join(' '))
+        fs.promises.writeFile(`./responses/${filingType}/secAPI/${fileName}-${partNumber}.txt`, chunks.join(' '))
       );
       results.push(chunks.join(' '));
       partNumber += 1;
@@ -127,7 +127,7 @@ async function chunkText(text, fileName) {
   if (chunks.length > 0) {
     // write any remaining chunks to file
     promises.push(
-      fs.promises.writeFile(`./responses/secAPI/${fileName}-${partNumber}.txt`, chunks.join(' '))
+      fs.promises.writeFile(`./responses/${filingType}/secAPI/${fileName}-${partNumber}.txt`, chunks.join(' '))
     );
     results.push(chunks.join(' '));
   }
@@ -135,10 +135,22 @@ async function chunkText(text, fileName) {
   return results;
 }
 
+async function processFiling(url, type, sectionIds){
+  const result = await extract10QSections(process.env.SEC_API_KEY, url, sectionIds);
+  let index = 0;
+  const promises = [];
+  // iterate over all the extracted secions of the report, check the data and get a response from GTPT
+  for (const [key, value] of Object.entries(result)) {
+    const chunks = await chunkText(value, key, type);
+    chunks.forEach((chunk, index) => promises.push(getOpenAIResponse(chunk, `${key} ${index}`, url, type)));
+  }
+  await Promise.all(promises);
+}
+
 
 
 async function main() {
-  const sectionIds = {
+  const sectionIds10Q = {
     'Financial Statements': 'part1item1',
     'Management\'s Discussion and Analysis of Financial Condition and Results of Operations': 'part1item2',
     'Quantitative and Qualitative Disclosures About Market Risk': 'part1item3',
@@ -151,6 +163,28 @@ async function main() {
     'Other Information': 'part2item5',
     'Exhibits': 'part2item6'
   };
+  const sectionIds10K = {
+    'Business': '1',
+    'Risk Factors': '1A',
+    'Unresolved Staff Comments': '1B',
+    'Properties': '2',
+    'Legal Proceedings': '3',
+    'Mine Safety Disclosures': '4',
+    'Market for Registrant’s Common Equity, Related Stockholder Matters and Issuer Purchases of Equity Securities': '5',
+    'Selected Financial Data (prior to February 2021)': '6',
+    'Management’s Discussion and Analysis of Financial Condition and Results of Operations': '7',
+    'Quantitative and Qualitative Disclosures about Market Risk': '7A',
+    'Financial Statements and Supplementary Data': '8',
+    'Changes in and Disagreements with Accountants on Accounting and Financial Disclosure': '9',
+    'Controls and Procedures': '9A',
+    'Other Information': '9B',
+    'Directors, Executive Officers and Corporate Governance': '10',
+    'Executive Compensation': '11',
+    'Security Ownership of Certain Beneficial Owners and Management and Related Stockholder Matters': '12',
+    'Certain Relationships and Related Transactions, and Director Independence': '13',
+    'Principal Accountant Fees and Services': '14'
+};
+
   const ticker = process.argv[2];
   debug("command: " + ticker);
   debug("argv: " + process.argv);
@@ -160,7 +194,7 @@ async function main() {
   const parts = [];
 /*
   q10Url.forEach(async url => {
-    const results = await extract10QSections(process.env.SEC_API_KEY, url, sectionIds);
+    const results = await extract10QSections(process.env.SEC_API_KEY, url, sectionIds10Q);
     results.forEach(async result => {
       for (const [key, value] of Object.entries(result)) {
         parts.push(await chunkText(value, key));
@@ -169,14 +203,7 @@ async function main() {
   });
 */
   // for now just get the most rescent 10-Q rather than parsing them all
-  const result = await extract10QSections(process.env.SEC_API_KEY, q10Url[0], sectionIds);
-  let index = 0;
-  const promises = [];
-  // iterate over all the extracted secions of the report, check the data and get a response from GTPT
-  for (const [key, value] of Object.entries(result)) {
-    const chunks = await chunkText(value, key);
-    chunks.forEach((chunk, index) => promises.push(getOpenAIResponse(chunk, `${key} ${index}`, q10Url[0])));
-  }
-  await Promise.all(promises);
+  await processFiling(q10Url[0], '10-Q', sectionIds10Q);
+  await processFiling(k10Url[0], '10-K', sectionIds10K);
 }
 main();

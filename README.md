@@ -12,10 +12,9 @@ This is why I parse the tables from the page HTML, which is the most dogshit HTM
 
 # Help Wanted
 I'd like to: 
-- Figure out how to deal with pages that contain a large number of toekns. Chunking the pages
-- to stay under the limit will lose context. Maybe use langchain or haystack and a huggingface model?
-Extend to 10-Ks which are more complicated to parse.
-- Explore usage of https://sec-api.io/ so I don't need to parse HTML pages
+- Figure out how to summerize the responses and get a final score on whether to invest
+- Store SEC filings, the inputs to OpenAI, and responses in a vector database
+- Implement LangChain or Haystack to generate and retrieve summaries using a supported LLM
 
 The responses need to be improved as well. We need to track the URL of the 10-Q that the page comes from. Also, I have ssen the model outputing wierd lage numbers at the bootom of the page in some cases. This prompt may need improvement: `Indicate the page number using ${fileName}`. The unltimate goal is to audit the responses and rate them 0-7 for quality after a manual review of the 10-Q.
 

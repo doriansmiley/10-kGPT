@@ -1,5 +1,4 @@
 const fs = require('fs');
-const { JSDOM } = require('jsdom');
 const { v4: uuidv4 } = require('uuid');
 const { Configuration, OpenAIApi } = require("openai");
 
@@ -59,11 +58,15 @@ async function extract10Qand10KUrls(cik) {
   return { q10Url, k10Url };
 }
 
-async function getOpenAIResponse(text, fileName, sourceUrl, filingType) {
-  if (fileName > 9) {
-    // save time and money, there could be a ton of pages! 10 is fine
-    return;
+async function getOpenAIResponse(text, fileName, sourceUrl, filingType, ticker) {
+  // create the required directories
+  try {
+    await fs.promises.mkdir(`./pages`, { recursive: true });
+    await fs.promises.mkdir(`./responses/${ticker}/${filingType}`, { recursive: true });
+  } catch (e) {
+    debug(e);
   }
+
   let prompt = `I am a financial analyst working at PwC reviewing the 10-Q and 10-K filings. Below is a page extracted from one of the filings. Please summarize the information as positive or negative (to a perspective investor) with a score. For example if the information appears to be positive to a potential investor include a table at the top of the response with "Rating: Positive, Score: Average" in the output. Evaluate Score based on the performance of an average high growth company.`;
   const question = text;
   prompt += `\nYou: ${question}\n`;
@@ -86,7 +89,7 @@ async function getOpenAIResponse(text, fileName, sourceUrl, filingType) {
       ]
     });
     const file = `<html><body><h1>${fileName}</h1><p> <a href="${sourceUrl}">Source: ${sourceUrl}</a></p>${gptResponse.data?.choices[0]?.message?.content}</body></html>`;
-    await fs.promises.writeFile(`./responses/${filingType}/${fileName}.html`, file);
+    await fs.promises.writeFile(`./responses/${ticker}/${filingType}/${fileName}.html`, file);
   } catch (e) {
     debug(e.message);
   }
@@ -104,7 +107,7 @@ async function extract10QSections(apiToken, edgarUrl, partIdentifierMap) {
   return Object.fromEntries(sections);
 }
 
-async function chunkText(text, fileName, filingType) {
+async function chunkText(text, fileName, filingType, ticker) {
   const CHUNK_SIZE = 1500;
   const regex = new RegExp(`(.{1,${CHUNK_SIZE}})\\s+`, 'g');
   let partNumber = 0;
@@ -112,12 +115,20 @@ async function chunkText(text, fileName, filingType) {
   const results = [];
   let match;
   const promises = [];
+
+  // create the required directories
+  try {
+    await fs.promises.mkdir(`./responses/${ticker}/${filingType}/secAPI`, { recursive: true });
+  } catch (e) {
+    debug(e);
+  }
+
   while ((match = regex.exec(text)) !== null) {
     chunks.push(match[1]); // store the chunk in the array
     if (chunks.join(' ').split(/\s+/).length > CHUNK_SIZE) {
       // if the total number of tokens exceeds the max chunk size, write to file and reset
       promises.push(
-        fs.promises.writeFile(`./responses/${filingType}/secAPI/${fileName}-${partNumber}.txt`, chunks.join(' '))
+        fs.promises.writeFile(`./responses/${ticker}/${filingType}/secAPI/${fileName}-${partNumber}.txt`, chunks.join(' '))
       );
       results.push(chunks.join(' '));
       partNumber += 1;
@@ -127,7 +138,7 @@ async function chunkText(text, fileName, filingType) {
   if (chunks.length > 0) {
     // write any remaining chunks to file
     promises.push(
-      fs.promises.writeFile(`./responses/${filingType}/secAPI/${fileName}-${partNumber}.txt`, chunks.join(' '))
+      fs.promises.writeFile(`./responses/${ticker}/${filingType}/secAPI/${fileName}-${partNumber}.txt`, chunks.join(' '))
     );
     results.push(chunks.join(' '));
   }
@@ -135,19 +146,17 @@ async function chunkText(text, fileName, filingType) {
   return results;
 }
 
-async function processFiling(url, type, sectionIds){
+async function processFiling(url, type, sectionIds, ticker){
   const result = await extract10QSections(process.env.SEC_API_KEY, url, sectionIds);
   let index = 0;
   const promises = [];
   // iterate over all the extracted secions of the report, check the data and get a response from GTPT
   for (const [key, value] of Object.entries(result)) {
-    const chunks = await chunkText(value, key, type);
-    chunks.forEach((chunk, index) => promises.push(getOpenAIResponse(chunk, `${key} ${index}`, url, type)));
+    const chunks = await chunkText(value, key, type, ticker);
+    chunks.forEach((chunk, index) => promises.push(getOpenAIResponse(chunk, `${key} ${index}`, url, type, ticker)));
   }
   await Promise.all(promises);
 }
-
-
 
 async function main() {
   const sectionIds10Q = {
@@ -197,13 +206,13 @@ async function main() {
     const results = await extract10QSections(process.env.SEC_API_KEY, url, sectionIds10Q);
     results.forEach(async result => {
       for (const [key, value] of Object.entries(result)) {
-        parts.push(await chunkText(value, key));
+        parts.push(await chunkText(value, key, type, ticker));
       }
     })
   });
 */
   // for now just get the most rescent 10-Q rather than parsing them all
-  await processFiling(q10Url[0], '10-Q', sectionIds10Q);
-  await processFiling(k10Url[0], '10-K', sectionIds10K);
+  await processFiling(q10Url[0], '10-Q', sectionIds10Q, ticker);
+  await processFiling(k10Url[0], '10-K', sectionIds10K, ticker);
 }
 main();

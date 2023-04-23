@@ -12,128 +12,65 @@ const configuration = new Configuration({
 
 const openai = new OpenAIApi(configuration);
 
-async function extract10Qand10KUrls(
-  edgarUrl
-) {
-  const response = await fetch(edgarUrl);
-  const data = await response.json();
+async function extract10Qand10KUrls(cik) {
+  const query = {
+    query: {
+      query_string: {
+        query: `ticker:(${cik}) AND formType:(10-Q OR 10-K)`
+      }
+    },
+    from: "0",
+    size: "20",
+    sort: [{ filedAt: { order: "desc" } }]
+  };
 
-  const filings = data?.filings?.recent ?? {};
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${process.env.SEC_API_KEY}`
+  };
+  debug(process.env.SEC_API_ENDPOINT);
+  debug(process.env.SEC_API_KEY);
+  debug({
+    method: 'POST',
+    headers,
+    body: JSON.stringify(query)
+  })
+  const response = await fetch(`${process.env.SEC_API_ENDPOINT}?token=${process.env.SEC_API_KEY}`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(query)
+  });
+
+  const data = await response.json();
+  const filings = data?.filings ?? [];
   const q10Url = [];
   const k10Url = [];
 
-  filings?.form?.forEach((f, index) => {
-    if (f === '10-Q') {
-      const accessionNumber = filings.accessionNumber[index].replace(/-/g, '');
-      q10Url.push(
-        `https://www.sec.gov/Archives/edgar/data/${data.cik}/${accessionNumber}/${filings.primaryDocument[index]}`
-      );
+  debug(filings.length)
+  filings.forEach(f => {
+    if (f.formType === '10-Q') {
+      q10Url.push(f.linkToFilingDetails);
     }
-    if (f === '10-K') {
-      const accessionNumber = filings.accessionNumber[index].replace(/-/g, '');
-      k10Url.push(
-        `https://www.sec.gov/Archives/edgar/data/${data.cik}/${accessionNumber}/${filings.primaryDocument[index]}`
-      );
+    if (f.formType === '10-K') {
+      k10Url.push(f.linkToFilingDetails);
     }
   });
 
   return { q10Url, k10Url };
 }
 
-async function fetch10qs(q10Urls) {
-  for (const url of q10Urls) {
-    const response = await fetch(url, { mode: 'no-cors' });
-    const html = await response.text();
-    const pages = parse10QPages(html);
-    const promises = []
-    pages.forEach((page, index)=>{
-      debug(`stripping page`);
-      const stripped = removeAttributes(page);
-      promises.push(getOpenAIResponse(stripped, index));
-    });
-    await Promise.all(promises);
-  }
-}
-
-function parse10QPages(html) {
-  const pages = [];
-  const dom = new JSDOM(html);
-  const pageDivs = dom.window.document.querySelectorAll('*');
-
-  let currentPage = null;
-  let tocFound = false;
-
-  for (let i = 0; i < pageDivs.length; i++) {
-    const div = pageDivs[i];
-
-    if (!tocFound && div.textContent.toLowerCase().includes('table of contents')) {
-      tocFound = true;
-      currentPage = dom.window.document.createElement('div');
-      currentPage.appendChild(div.cloneNode(true));
-    } else if (tocFound && div.tagName === 'HR') {
-      currentPage.appendChild(div.cloneNode(true));
-      const optimized = htmlToTextExceptTables(currentPage.outerHTML);
-      pages.push(optimized);
-      currentPage = null;
-      tocFound = false;
-    } else if (tocFound) {
-      currentPage.appendChild(div.cloneNode(true));
-    }
-  }
-
-  return pages;
-}
-
-
-function htmlToTextExceptTables(html) {
-  const dom = new JSDOM();
-  const doc = dom.window.document;
-  const div = doc.createElement('div');
-  div.innerHTML = html;
-  let output = '';
-  const Node = new JSDOM('').window.Node;
-  function extractNode(node) {
-    if (node.nodeType === Node.ELEMENT_NODE) {
-      if (node.tagName === 'TABLE') {
-        // debug('found a table');
-        output += node.outerHTML;
-      } else if (node.childNodes.length > 0) {
-        // debug('found a child node');
-        for (let i = 0; i < node.childNodes.length; i++) {
-          extractNode(node.childNodes[i]);
-        }
-      }
-    } else if (node.nodeType === Node.TEXT_NODE) {
-      // debug('found a text node');
-      output += node.nodeValue;
-    }
-  }
-
-  for (let i = 0; i < div.childNodes.length; i++) {
-    extractNode(div.childNodes[i]);
-  }
-  // debug('retuning output')
-  return output;
-}
-
-function removeAttributes(html) {
-  return html.replace(/<[^>]*>/g, (match) => {
-    return match.replace(/\S+="[^"]+"/g, '');
-  });
-}
-
-async function getOpenAIResponse(html, fileName) {
+async function getOpenAIResponse(text, fileName, sourceUrl) {
   if (fileName > 9) {
     // save time and money, there could be a ton of pages! 10 is fine
     return;
   }
-  let prompt = `Please analyze the extracted page from the 10-Q filling in an HTML table listing positives and negatives. Indicate the page number using ${fileName}. Format the output as HTML.`;
-  const question = html;
+  let prompt = `I am a financial analyst working at PwC reviewing the 10-Q and 10-K filings. Below is a page extracted from one of the filings. Please summarize the information as positive or negative (to a perspective investor) with a score. For example if the information appears to be positive to a potential investor include a table at the top of the response with "Rating: Positive, Score: Average" in the output. Evaluate Score based on the performance of an average high growth company.`;
+  const question = text;
   prompt += `\nYou: ${question}\n`;
 
-  await fs.promises.writeFile(`./pages/${fileName}-${uuidv4()}.html`, html);
+  await fs.promises.writeFile(`./pages/${fileName}-${uuidv4()}.html`, text);
 
-  const count = prompt.split(' ').length + html.split(' ').length;
+  const count = prompt.split(' ').length + text.split(' ').length;
   if (count > 4000) {
     debug(`Token count: ${count} exceeds maximum`);
     return;
@@ -148,44 +85,98 @@ async function getOpenAIResponse(html, fileName) {
         { "role": "user", "content": prompt },
       ]
     });
-    const uniqueId = uuidv4();
-    const file = `<html><body><h1>${fileName}</h1>${gptResponse.data?.choices[0]?.message?.content}</body></html>`;
-    await fs.promises.writeFile(`./responses/${fileName}-${uniqueId}.html`, file);
+    const file = `<html><body><h1>${fileName}</h1><p> <a href="${sourceUrl}">Source: ${sourceUrl}</a></p>${gptResponse.data?.choices[0]?.message?.content}</body></html>`;
+    await fs.promises.writeFile(`./responses/${fileName}.html`, file);
   } catch (e) {
     debug(e.message);
   }
 }
 
-async function getCompanyDetails(ticker) {
-  const searchUrl = `https://www.sec.gov/cgi-bin/browse-edgar?CIK=${ticker}&owner=exclude&action=getcompany&output=atom`;
+async function extract10QSections(apiToken, edgarUrl, partIdentifierMap) {
+  const sectionPromises = Object.entries(partIdentifierMap).map(async ([partName, identifier]) => {
+    const url = `https://api.sec-api.io/extractor?url=${edgarUrl}&item=${identifier}&type=text&token=${apiToken}`;
+    const response = await fetch(url);
+    const data = await response.text();
+    return [partName, data];
+  });
 
-  const response = await fetch(searchUrl);
-  const xmlData = await response.text();
-
-  const dom = new JSDOM(xmlData, { contentType: "application/xml" });
-  const document = dom.window.document;
-
-  const cik = document.querySelector('cik').textContent;
-  const companyName = document.querySelector('conformed-name').textContent;
-
-  return { cik, ticker, companyName };
+  const sections = await Promise.all(sectionPromises);
+  return Object.fromEntries(sections);
 }
 
+async function chunkText(text, fileName) {
+  const CHUNK_SIZE = 1500;
+  const regex = new RegExp(`(.{1,${CHUNK_SIZE}})\\s+`, 'g');
+  let partNumber = 0;
+  const chunks = [];
+  const results = [];
+  let match;
+  const promises = [];
+  while ((match = regex.exec(text)) !== null) {
+    chunks.push(match[1]); // store the chunk in the array
+    if (chunks.join(' ').split(/\s+/).length > CHUNK_SIZE) {
+      // if the total number of tokens exceeds the max chunk size, write to file and reset
+      promises.push(
+        fs.promises.writeFile(`./responses/secAPI/${fileName}-${partNumber}.txt`, chunks.join(' '))
+      );
+      results.push(chunks.join(' '));
+      partNumber += 1;
+      chunks.length = 0;
+    }
+  }
+  if (chunks.length > 0) {
+    // write any remaining chunks to file
+    promises.push(
+      fs.promises.writeFile(`./responses/secAPI/${fileName}-${partNumber}.txt`, chunks.join(' '))
+    );
+    results.push(chunks.join(' '));
+  }
+  await Promise.all(promises);
+  return results;
+}
+
+
+
 async function main() {
+  const sectionIds = {
+    'Financial Statements': 'part1item1',
+    'Management\'s Discussion and Analysis of Financial Condition and Results of Operations': 'part1item2',
+    'Quantitative and Qualitative Disclosures About Market Risk': 'part1item3',
+    'Controls and Procedures': 'part1item4',
+    'Legal Proceedings': 'part2item1',
+    'Risk Factors': 'part2item1a',
+    'Unregistered Sales of Equity Securities and Use of Proceeds': 'part2item2',
+    'Defaults Upon Senior Securities': 'part2item3',
+    'Mine Safety Disclosures': 'part2item4',
+    'Other Information': 'part2item5',
+    'Exhibits': 'part2item6'
+  };
   const ticker = process.argv[2];
   debug("command: " + ticker);
   debug("argv: " + process.argv);
-  const { cik, companyName } = await getCompanyDetails(ticker);
-  debug (cik);
-  debug(companyName);
-  const edgarUrl = `https://data.sec.gov/submissions/CIK${cik}.json`;
-  const jsdom = require('jsdom');
-  const { JSDOM } = jsdom;
-
-  const { q10Url, k10Url } = await extract10Qand10KUrls(edgarUrl);
-  const reports = await fetch10qs(
-    q10Url || []
-  );
-  return true;
+  const { q10Url, k10Url } = await extract10Qand10KUrls(ticker);
+  debug(q10Url);
+  debug(k10Url);
+  const parts = [];
+/*
+  q10Url.forEach(async url => {
+    const results = await extract10QSections(process.env.SEC_API_KEY, url, sectionIds);
+    results.forEach(async result => {
+      for (const [key, value] of Object.entries(result)) {
+        parts.push(await chunkText(value, key));
+      }
+    })
+  });
+*/
+  // for now just get the most rescent 10-Q rather than parsing them all
+  const result = await extract10QSections(process.env.SEC_API_KEY, q10Url[0], sectionIds);
+  let index = 0;
+  const promises = [];
+  // iterate over all the extracted secions of the report, check the data and get a response from GTPT
+  for (const [key, value] of Object.entries(result)) {
+    const chunks = await chunkText(value, key);
+    chunks.forEach((chunk, index) => promises.push(getOpenAIResponse(chunk, `${key} ${index}`, q10Url[0])));
+  }
+  await Promise.all(promises);
 }
 main();

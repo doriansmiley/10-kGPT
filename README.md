@@ -25,6 +25,13 @@ It's important to note you can't just pass the entire filling or you will hit GP
 `npm install`
 
 # Run
-Create the pages directory. This is where pages are saved for research puposes. I ignore this directory since it will result in a large number of files. After creating the pages directory run `npm run start $TICKER` passing the ticker symbol of the ocmpany you want to analyze.
+- Create the pages directory. This is where pages are saved for research puposes. I ignore this directory since it will result in a large number of files. After creating the pages directory 
+- Creatre your .env file and add `OPENAI_API_KEY=<YOUR KEY>`
+- run `npm run start $TICKER` passing the ticker symbol of the ocmpany you want to analyze.
 
 This will run `node node-index` passing the ticker symbok you specify and save responses to the `responses` directory. 
+
+You can view output in the responses directory. The chunks used to generate each response is under 
+`responses/secAPI`. This can be useful to audit what inputs were used to generatr the response. 
+
+Please note all output will be overwritten with each run. This is to reduce file build up.

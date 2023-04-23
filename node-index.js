@@ -178,7 +178,7 @@ async function main() {
   const { cik, companyName } = await getCompanyDetails(ticker);
   debug (cik);
   debug(companyName);
-  const edgarUrl = `https://data.sec.gov/submissions/${cik}.json`;
+  const edgarUrl = `https://data.sec.gov/submissions/CIK${cik}.json`;
   const jsdom = require('jsdom');
   const { JSDOM } = jsdom;
 

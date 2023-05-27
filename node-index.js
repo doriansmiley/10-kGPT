@@ -58,20 +58,44 @@ async function extract10Qand10KUrls(cik) {
   return { q10Url, k10Url };
 }
 
+function getPrompt(text, fileName) {
+  console.log(`fileName: ${fileName}`);
+  const format = 'You are only allowed to respond in HTML.' +
+  'Make sure your response can be parsed as a template fragement (ie it does not include document head or body tags).' + 
+  'Format your answer in a way that is pleaseing to humans, such as using tables to highlite and organize information.';
+  const base = 'You a financial analyst working at PwC reviewing the 10-Q and 10-K filings. Below is a page extracted from one of the filings.'+
+  'Please summarize the information as positive or negative (to a perspective investor) with a score.'+
+  'For example if the information appears to be positive to a potential investor include a table at the top of the response'+
+  ' with "Rating: Positive, Score: Average" in the output. Evaluate Score based on the performance of an average high growth company.';
+  // TODO add handling for all financial documents (ie cash flow etc)
+  // create one prompt for each calcuation we want to run, ie https://www.investopedia.com/articles/basics/06/assetperformance.asp
+  if (fileName.indexOf('Financial Statements') >= 0 && text.toLowerCase().indexOf('condensed consolidated balance sheets') >= 0) {
+    console.log(`fileName: ${fileName} generating chain of though prompt`);
+    return base+
+    ` Use common GAAP approved methods to evaluate the quality of`+
+    ` the balance sheet, revenue, cash flow, etc. To do this lets think step by step to make sure we get the right answer. `+
+    `Include the steps you used to generate your repsonse and explain why you think it was correct.` +
+    format
+  }
+  return base;
+}
+
 async function getOpenAIResponse(text, fileName, sourceUrl, filingType, ticker) {
   // create the required directories
   try {
-    await fs.promises.mkdir(`./pages`, { recursive: true });
+    await fs.promises.mkdir(`./pages/${ticker}/${filingType}`, { recursive: true });
     await fs.promises.mkdir(`./responses/${ticker}/${filingType}`, { recursive: true });
   } catch (e) {
     debug(e);
   }
 
-  let prompt = `I am a financial analyst working at PwC reviewing the 10-Q and 10-K filings. Below is a page extracted from one of the filings. Please summarize the information as positive or negative (to a perspective investor) with a score. For example if the information appears to be positive to a potential investor include a table at the top of the response with "Rating: Positive, Score: Average" in the output. Evaluate Score based on the performance of an average high growth company.`;
+  let prompt = getPrompt(text, fileName);
+  // TODO generate three different version of the answer and feed it back to the model using refelction
+  // then add a resolver step, ie smart GPT: https://www.youtube.com/watch?v=wVzuvf9D9BU
   const question = text;
   prompt += `\nYou: ${question}\n`;
 
-  await fs.promises.writeFile(`./pages/${fileName}-${uuidv4()}.html`, text);
+  await fs.promises.writeFile(`./pages/${ticker}/${filingType}/${fileName}.html`, text);
 
   const count = prompt.split(' ').length + text.split(' ').length;
   if (count > 4000) {

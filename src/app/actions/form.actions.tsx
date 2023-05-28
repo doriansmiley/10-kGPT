@@ -17,7 +17,7 @@ const chainMachine = createMachine({
         ticker: undefined,
         errorMessage: undefined,
         results: undefined,
-        q10Url: undefined, 
+        q10Url: undefined,
         k10Url: undefined,
     } as {
         url?: string,
@@ -25,8 +25,8 @@ const chainMachine = createMachine({
         ticker?: string,
         errorMessage?: string | undefined,
         results?: { value: string | undefined },
-        q10Url?: string, 
-        k10Url?: string,
+        q10Url?: string[],
+        k10Url?: string[],
     },
     states: {
         getURLs: {
@@ -45,7 +45,7 @@ const chainMachine = createMachine({
                 },
                 onDone: {
                     target: 'processFilings',
-                    actions: assign({ results: (context, event) => event.data })
+                    actions: assign((context, event) => event.data),
                 }
             }
         },
@@ -54,9 +54,9 @@ const chainMachine = createMachine({
                 id: 'processFilings',
                 src: (context, event) => processFiling(
                     {
-                        url: context.q10Url!,
+                        urls: context.q10Url!,
                         type: '10-Q',
-                        sectionIds: context.sectionIds!,
+                        sectionIds: sectionIds10Q,
                         ticker: context.ticker!,
                     }
                 ),
@@ -88,11 +88,11 @@ const chainMachine = createMachine({
 export async function analyzeStock({ ticker }: { ticker: string }): Promise<{ value: string, context: any }> {
     debug(`analyzeStock called wtih ${ticker}`);
     return new Promise(async (resolve, reject) => {
-        chainMachine.withContext({
+        const machineWithContext = chainMachine.withContext({
             ticker,
         })
         // Machine instance with internal state
-        const toggleActor = interpret(chainMachine);
+        const toggleActor = interpret(machineWithContext);
         toggleActor.subscribe((state) => {
             debug(`curent state is ${state.value}`);
             debug(`context is: ${JSON.stringify(state.context)}`);

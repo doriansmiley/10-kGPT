@@ -1,9 +1,13 @@
 import * as React from 'react';
-import { MainContainer } from '@gpt10k/components';
+import {useRef} from 'react';
+import { useRouter } from 'next/navigation';
+import { MainContainer, TickerForm } from '@gpt10k/components';
+
 export default function Home() {
+
   return (
       <MainContainer {...{header: 'Home'}} >
-        <>Home</>
+        <TickerForm />
       </MainContainer>
   )
 }

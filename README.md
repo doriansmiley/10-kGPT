@@ -1,37 +1,34 @@
-# 10-kGPT
+This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
-IMPORTANT: this project is very early in development. Expect issues!!!
+## Getting Started
 
-# Background
-I started this aas a TypeScript app but I got a CORS block from the SEC.
-So I moved it to Node. The script will scrape the SEC site for 10Q's for Palantir
-then ask GPT to summerize and save the ouput to the `responses` directory.
+First, run the development server:
 
-It's important to note you can't just pass the entire filling or you will hit GPT token limits.
-This is why I parse the tables from the page HTML, which is the most dogshit HTML I have ever seen.
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+```
 
-# Help Wanted
-I'd like to: 
-- Figure out how to summerize the responses and get a final score on whether to invest
-- Store SEC filings, the inputs to OpenAI, and responses in a vector database
-- Implement LangChain or Haystack to generate and retrieve summaries using a supported LLM
-- Process all the returned filings
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-The responses need to be improved as well. We need to track the URL of the 10-Q that the page comes from. Also, I have ssen the model outputing wierd lage numbers at the bootom of the page in some cases. This prompt may need improvement: `Indicate the page number using ${fileName}`. The unltimate goal is to audit the responses and rate them 0-7 for quality after a manual review of the 10-Q.
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-It's important to note you can't just pass the entire filling or you will hit GPT token limits.
+This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
 
-# Setup
-`npm install`
+## Learn More
 
-# Run
-- Create the pages directory. This is where pages are saved for research puposes. I ignore this directory since it will result in a large number of files. After creating the pages directory 
-- Creatre your .env file and add `OPENAI_API_KEY=<YOUR_KEY>`, `SEC_API_KEY=<YOUR_KEY>` and `SEC_API_ENDPOINT=https://api.sec-api.io/`
-- run `npm run start $TICKER` passing the ticker symbol of the ocmpany you want to analyze.
+To learn more about Next.js, take a look at the following resources:
 
-This will run `node node-index` passing the ticker symbok you specify and save responses to the `responses` directory. The script currently only analyzes the most rescent 10-Q. 
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-You can view output in the responses directory. The chunks used to generate each response is under 
-`responses/secAPI`. This can be useful to audit what inputs were used to generatr the response. 
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
 
-Please note all output will be overwritten with each run. This is to reduce file build up.
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.

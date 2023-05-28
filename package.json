@@ -1,18 +1,27 @@
 {
-  "name": "your-project-name",
-  "version": "1.0.0",
-  "description": "Your project description",
+  "name": "tenk-gpt",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "start": "node node-index"
-  },
-  "devDependencies": {
-    "typescript": "latest"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
-    "debug": "^4.3.4",
-    "dotenv": "^16.0.3",
-    "jsdom": "^21.1.1",
-    "openai": "^3.2.1",
-    "uuid": "^9.0.0"
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
+    "@fontsource/roboto": "^5.0.1",
+    "@mui/icons-material": "^5.11.16",
+    "@mui/material": "^5.13.2",
+    "@types/node": "20.2.5",
+    "@types/react": "18.2.7",
+    "@types/react-dom": "18.2.4",
+    "eslint": "8.41.0",
+    "eslint-config-next": "13.4.4",
+    "next": "13.4.4",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "typescript": "5.0.4"
   }
 }

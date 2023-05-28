@@ -16,8 +16,8 @@ export default function StockAnalysis({ticker}: {ticker: string}) {
     }, [ticker]);
     return (
         <div>
-            <p style={{display: isPending ? 'inline' : 'none'}}>loading...</p>
-            <p style={{display: isPending ? 'none' : 'inline'}}>result {analysis?.value}</p>
+            <p style={{display: analysis ? 'none' : 'inline'}}>loading...</p>
+            <p style={{display: analysis ? 'inline' : 'none'}}>result {analysis?.value}</p>
         </div>
     )
 }

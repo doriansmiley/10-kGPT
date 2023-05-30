@@ -83,7 +83,6 @@ function getPrompt(text, fileName) {
 async function getOpenAIResponse(text, fileName, sourceUrl, filingType, ticker) {
   // create the required directories
   try {
-    await fs.promises.mkdir(`./pages/${ticker}/${filingType}`, { recursive: true });
     await fs.promises.mkdir(`./responses/${ticker}/${filingType}`, { recursive: true });
   } catch (e) {
     debug(e);
@@ -95,7 +94,7 @@ async function getOpenAIResponse(text, fileName, sourceUrl, filingType, ticker) 
   const question = text;
   prompt += `\nYou: ${question}\n`;
 
-  await fs.promises.writeFile(`./pages/${ticker}/${filingType}/${fileName}.html`, text);
+  await fs.promises.writeFile(`./responses/${ticker}/${filingType}/${fileName}-prompt.txt`, text);
 
   const count = prompt.split(' ').length + text.split(' ').length;
   if (count > 4000) {

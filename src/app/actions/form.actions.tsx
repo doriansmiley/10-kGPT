@@ -44,19 +44,46 @@ const chainMachine = createMachine({
                     })
                 },
                 onDone: {
-                    target: 'processFilings',
+                    target: 'process10QFilings',
                     actions: assign((context, event) => event.data),
                 }
             }
         },
-        processFilings: {
+        process10QFilings: {
             invoke: {
-                id: 'processFilings',
+                id: 'process10QFilings',
                 src: (context, event) => processFiling(
                     {
                         urls: context.q10Url!,
                         type: '10-Q',
                         sectionIds: sectionIds10Q,
+                        ticker: context.ticker!,
+                    }
+                ),
+                onError: {
+                    target: 'failure',
+                    actions: assign({
+                        errorMessage: (context, event) => {
+                            // event is:
+                            // { type: 'error.platform', data: 'No query specified' }
+                            return event.data;
+                        }
+                    })
+                },
+                onDone: {
+                    target: 'process10KFilings',
+                    actions: assign({ results: (context, event) => event.data })
+                }
+            }
+        },
+        process10KFilings: {
+            invoke: {
+                id: 'process10KFilings',
+                src: (context, event) => processFiling(
+                    {
+                        urls: context.k10Url!,
+                        type: '10-K',
+                        sectionIds: sectionIds10K,
                         ticker: context.ticker!,
                     }
                 ),

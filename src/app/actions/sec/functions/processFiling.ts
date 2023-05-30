@@ -14,9 +14,17 @@ const vectorStore = new MemoryVectorStore(new OpenAIEmbeddings());
 
 export default async function processFiling({ urls, type, sectionIds, ticker }: { urls: string[], type: string, sectionIds: Record<string, string>, ticker: string }) {
   debug(`processFiling called with debug setting: ${process.env.DEBUG}`);
-  debug(`url: ${urls}`);
+  debug(`urls: ${urls}`);
   debug(`type: ${type}`);
   debug(`ticker: ${ticker}`);
+
+  //check if we have documents for the ticker already
+  const documents = vectorStore.similaritySearch(`DOCUMENT TYPE: SEC filing Type: ${type} for Stock Ticker Symbol: ${ticker}`)
+  debug(`documents ${(await documents).length}`);
+  if ((await documents).length > 0) {
+    return `Retrieved processed documents from the vector store for ${ticker}`;
+  }
+  
   const sectionPromises: Promise<[partName: string, data: string]>[] = [];
 
   const splitter = new CharacterTextSplitter({

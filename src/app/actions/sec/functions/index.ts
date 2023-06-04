@@ -2,6 +2,7 @@ import processFiling from './processFiling';
 import extract10Qand10KUrls from './extract10Qand10KUrls';
 
 export {processFiling as processFiling};
+export {vectorStore} from './processFiling';
 export {extract10Qand10KUrls as extract10Qand10KUrls};
 export const sectionIds10Q = {
     'Financial Statements': 'part1item1',
